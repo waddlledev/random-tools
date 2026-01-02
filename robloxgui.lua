@@ -1,6 +1,4 @@
 local UIS = game:GetService("UserInputService")
-local Players = game:GetService("Players")
-local Player = Players.LocalPlayer
 
 local Library = {}
 Library.Keybind = Enum.KeyCode.RightShift
@@ -15,7 +13,6 @@ local Theme = {
 }
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "PurpleUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game:GetService("CoreGui")
 
@@ -29,30 +26,30 @@ Main.Parent = ScreenGui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
 
 do
-    local dragging, dragStart, startPos
-    Main.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    local dragging, startPos, startInput
+    Main.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
-            dragStart = input.Position
+            startInput = i.Position
             startPos = Main.Position
         end
     end)
-    UIS.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
+    UIS.InputChanged:Connect(function(i)
+        if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = i.Position - startInput
             Main.Position = startPos + UDim2.fromOffset(delta.X, delta.Y)
         end
     end)
-    UIS.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    UIS.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = false
         end
     end)
 end
 
 local Header = Instance.new("TextLabel")
-Header.Size = UDim2.new(1, -40, 0, 44)
-Header.Position = UDim2.fromOffset(20, 0)
+Header.Size = UDim2.new(1, -60, 0, 40)
+Header.Position = UDim2.fromOffset(20, 5)
 Header.BackgroundTransparency = 1
 Header.Text = "Purple UI"
 Header.Font = Enum.Font.GothamBold
@@ -62,8 +59,8 @@ Header.TextXAlignment = Enum.TextXAlignment.Left
 Header.Parent = Main
 
 local Close = Instance.new("TextButton")
-Close.Size = UDim2.fromOffset(30, 30)
-Close.Position = UDim2.new(1, -40, 0, 7)
+Close.Size = UDim2.fromOffset(32, 32)
+Close.Position = UDim2.new(1, -42, 0, 6)
 Close.BackgroundColor3 = Theme.Panel
 Close.Text = "✕"
 Close.TextColor3 = Theme.Text
@@ -77,34 +74,34 @@ Close.MouseButton1Click:Connect(function()
     Main.Visible = false
 end)
 
-UIS.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == Library.Keybind then
+UIS.InputBegan:Connect(function(i, g)
+    if not g and i.KeyCode == Library.Keybind then
         Library.Open = not Library.Open
         Main.Visible = Library.Open
     end
 end)
 
 local Tabs = Instance.new("Frame")
-Tabs.Size = UDim2.fromOffset(140, 300)
-Tabs.Position = UDim2.fromOffset(10, 50)
+Tabs.Size = UDim2.fromOffset(140, 290)
+Tabs.Position = UDim2.fromOffset(10, 55)
 Tabs.BackgroundColor3 = Theme.Panel
 Tabs.BorderSizePixel = 0
 Tabs.Parent = Main
 Instance.new("UICorner", Tabs).CornerRadius = UDim.new(0, 12)
 
-local TabList = Instance.new("UIListLayout")
-TabList.Padding = UDim.new(0, 6)
-TabList.Parent = Tabs
+local TabsLayout = Instance.new("UIListLayout")
+TabsLayout.Padding = UDim.new(0, 6)
+TabsLayout.Parent = Tabs
 
 local Pages = Instance.new("Frame")
-Pages.Size = UDim2.fromOffset(340, 300)
-Pages.Position = UDim2.fromOffset(170, 50)
+Pages.Size = UDim2.fromOffset(340, 290)
+Pages.Position = UDim2.fromOffset(170, 55)
 Pages.BackgroundTransparency = 1
 Pages.Parent = Main
 
 function Library:CreateTab(name)
     local Button = Instance.new("TextButton")
-    Button.Size = UDim2.new(1, -10, 0, 36)
+    Button.Size = UDim2.new(1, -10, 0, 34)
     Button.BackgroundColor3 = Theme.Background
     Button.Text = name
     Button.TextColor3 = Theme.Text
@@ -115,8 +112,8 @@ function Library:CreateTab(name)
 
     local Page = Instance.new("ScrollingFrame")
     Page.Size = UDim2.fromScale(1, 1)
-    Page.CanvasSize = UDim2.fromScale(0, 0)
     Page.ScrollBarImageTransparency = 1
+    Page.CanvasSize = UDim2.fromOffset(0, 0)
     Page.Visible = false
     Page.Parent = Pages
 
@@ -125,7 +122,7 @@ function Library:CreateTab(name)
     Layout.Parent = Page
 
     Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        Page.CanvasSize = UDim2.fromOffset(0, Layout.AbsoluteContentSize.Y + 10)
+        Page.CanvasSize = UDim2.fromOffset(0, Layout.AbsoluteContentSize.Y + 8)
     end)
 
     Button.MouseButton1Click:Connect(function()
@@ -142,11 +139,11 @@ end
 
 function Library:Label(parent, text)
     local L = Instance.new("TextLabel")
-    L.Size = UDim2.new(1, -10, 0, 30)
+    L.Size = UDim2.new(1, -10, 0, 26)
     L.BackgroundTransparency = 1
     L.Text = text
     L.Font = Enum.Font.Gotham
-    L.TextSize = 14
+    L.TextSize = 13
     L.TextColor3 = Theme.Muted
     L.TextXAlignment = Enum.TextXAlignment.Left
     L.Parent = parent
@@ -154,7 +151,7 @@ end
 
 function Library:Toggle(parent, text, callback)
     local T = Instance.new("TextButton")
-    T.Size = UDim2.new(1, -10, 0, 36)
+    T.Size = UDim2.new(1, -10, 0, 34)
     T.BackgroundColor3 = Theme.Panel
     T.Text = text
     T.TextColor3 = Theme.Text
@@ -163,28 +160,29 @@ function Library:Toggle(parent, text, callback)
     T.Parent = parent
     Instance.new("UICorner", T).CornerRadius = UDim.new(0, 8)
 
-    local on = false
+    local state = false
     T.MouseButton1Click:Connect(function()
-        on = not on
-        T.BackgroundColor3 = on and Theme.Accent or Theme.Panel
-        callback(on)
+        state = not state
+        T.BackgroundColor3 = state and Theme.Accent or Theme.Panel
+        if callback then callback(state) end
     end)
 end
 
 function Library:Textbox(parent, placeholder, callback)
     local B = Instance.new("TextBox")
-    B.Size = UDim2.new(1, -10, 0, 36)
+    B.Size = UDim2.new(1, -10, 0, 34)
     B.BackgroundColor3 = Theme.Panel
     B.PlaceholderText = placeholder
     B.Text = ""
     B.TextColor3 = Theme.Text
     B.Font = Enum.Font.Gotham
     B.TextSize = 14
+    B.ClearTextOnFocus = false
     B.Parent = parent
     Instance.new("UICorner", B).CornerRadius = UDim.new(0, 8)
 
     B.FocusLost:Connect(function()
-        callback(B.Text)
+        if callback then callback(B.Text) end
     end)
 end
 
