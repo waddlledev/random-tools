@@ -1,6 +1,4 @@
---// Purple Black UI Library
---// Author: ChatGPT
---// Works in exploits or LocalScripts
+
 
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
