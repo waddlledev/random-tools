@@ -1,7 +1,4 @@
-
-
 local UIS = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 
@@ -9,7 +6,6 @@ local Library = {}
 Library.Keybind = Enum.KeyCode.RightShift
 Library.Open = true
 
---// Theme
 local Theme = {
     Background = Color3.fromRGB(10, 8, 18),
     Panel = Color3.fromRGB(18, 14, 30),
@@ -18,13 +14,11 @@ local Theme = {
     Muted = Color3.fromRGB(160, 150, 200)
 }
 
---// ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "PurpleUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game:GetService("CoreGui")
 
---// Main Window
 local Main = Instance.new("Frame")
 Main.Size = UDim2.fromOffset(520, 360)
 Main.Position = UDim2.fromScale(0.5, 0.5)
@@ -32,10 +26,8 @@ Main.AnchorPoint = Vector2.new(0.5, 0.5)
 Main.BackgroundColor3 = Theme.Background
 Main.BorderSizePixel = 0
 Main.Parent = ScreenGui
-
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
 
---// Drag
 do
     local dragging, dragStart, startPos
     Main.InputBegan:Connect(function(input)
@@ -58,7 +50,6 @@ do
     end)
 end
 
---// Header
 local Header = Instance.new("TextLabel")
 Header.Size = UDim2.new(1, -40, 0, 44)
 Header.Position = UDim2.fromOffset(20, 0)
@@ -67,10 +58,9 @@ Header.Text = "Purple UI"
 Header.Font = Enum.Font.GothamBold
 Header.TextSize = 20
 Header.TextColor3 = Theme.Text
-Header.TextXAlignment = Left
+Header.TextXAlignment = Enum.TextXAlignment.Left
 Header.Parent = Main
 
---// Close Button
 local Close = Instance.new("TextButton")
 Close.Size = UDim2.fromOffset(30, 30)
 Close.Position = UDim2.new(1, -40, 0, 7)
@@ -87,7 +77,6 @@ Close.MouseButton1Click:Connect(function()
     Main.Visible = false
 end)
 
---// Toggle UI Key
 UIS.InputBegan:Connect(function(input, gpe)
     if not gpe and input.KeyCode == Library.Keybind then
         Library.Open = not Library.Open
@@ -95,7 +84,6 @@ UIS.InputBegan:Connect(function(input, gpe)
     end
 end)
 
---// Tabs
 local Tabs = Instance.new("Frame")
 Tabs.Size = UDim2.fromOffset(140, 300)
 Tabs.Position = UDim2.fromOffset(10, 50)
@@ -104,17 +92,16 @@ Tabs.BorderSizePixel = 0
 Tabs.Parent = Main
 Instance.new("UICorner", Tabs).CornerRadius = UDim.new(0, 12)
 
-local TabList = Instance.new("UIListLayout", Tabs)
+local TabList = Instance.new("UIListLayout")
 TabList.Padding = UDim.new(0, 6)
+TabList.Parent = Tabs
 
---// Pages
 local Pages = Instance.new("Frame")
 Pages.Size = UDim2.fromOffset(340, 300)
 Pages.Position = UDim2.fromOffset(170, 50)
 Pages.BackgroundTransparency = 1
 Pages.Parent = Main
 
---// Create Tab
 function Library:CreateTab(name)
     local Button = Instance.new("TextButton")
     Button.Size = UDim2.new(1, -10, 0, 36)
@@ -133,15 +120,16 @@ function Library:CreateTab(name)
     Page.Visible = false
     Page.Parent = Pages
 
-    local Layout = Instance.new("UIListLayout", Page)
+    local Layout = Instance.new("UIListLayout")
     Layout.Padding = UDim.new(0, 8)
+    Layout.Parent = Page
 
     Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         Page.CanvasSize = UDim2.fromOffset(0, Layout.AbsoluteContentSize.Y + 10)
     end)
 
     Button.MouseButton1Click:Connect(function()
-        for _, v in pairs(Pages:GetChildren()) do
+        for _, v in ipairs(Pages:GetChildren()) do
             if v:IsA("ScrollingFrame") then
                 v.Visible = false
             end
@@ -152,7 +140,6 @@ function Library:CreateTab(name)
     return Page
 end
 
---// UI Elements
 function Library:Label(parent, text)
     local L = Instance.new("TextLabel")
     L.Size = UDim2.new(1, -10, 0, 30)
@@ -161,7 +148,7 @@ function Library:Label(parent, text)
     L.Font = Enum.Font.Gotham
     L.TextSize = 14
     L.TextColor3 = Theme.Muted
-    L.TextXAlignment = Left
+    L.TextXAlignment = Enum.TextXAlignment.Left
     L.Parent = parent
 end
 
@@ -201,5 +188,4 @@ function Library:Textbox(parent, placeholder, callback)
     end)
 end
 
---// Return Library
 return Library
