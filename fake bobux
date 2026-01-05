@@ -1,0 +1,1129 @@
+// ==UserScript==
+// @name         Robux Gen V1
+// @namespace    http://waddleops.devv
+// @version      1.0
+// @description  Awsome bobux gen
+// @author       Waddle
+// @match        https://www.roblox.com/*
+// @match        https://roblox.com/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let RobuxAmount = 0;
+    let isActive = false;
+    let originalAmount = null;
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+
+    function formatNumber(num) {
+        if (!num || num === '0') return '0';
+        return parseInt(num).toLocaleString();
+    }
+
+    function createControlPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'robux-panel';
+        panel.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(10, 10, 10, 0.95);
+                border: 1px solid #333;
+                border-radius: 8px;
+                padding: 16px;
+                color: #ccc;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-size: 13px;
+                z-index: 999999;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+                min-width: 220px;
+                cursor: move;
+                backdrop-filter: blur(10px);
+                user-select: none;
+            ">
+                <div style="text-align: center; margin-bottom: 12px; font-weight: 500; color: #fff; letter-spacing: 1px;">
+                    R0BUX3R
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <input type="text" id="fake-robux-input" value="1,000,000"
+                           style="width: 100%; padding: 8px 12px; border: 1px solid #444; border-radius: 6px;
+                                  background: rgba(255,255,255,0.05); color: #fff; font-family: inherit;
+                                  font-size: 14px; outline: none; transition: all 0.2s;">
+                </div>
+
+                <div style="margin-bottom: 12px; display: flex; gap: 8px;">
+                    <button class="preset-btn" data-amount="69420"
+                            style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: #ccc;
+                                   border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 12px;
+                                   transition: all 0.2s;">69.4K</button>
+                    <button class="preset-btn" data-amount="1000000"
+                            style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: #ccc;
+                                   border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 12px;
+                                   transition: all 0.2s;">1M</button>
+                    <button class="preset-btn" data-amount="1000000000"
+                            style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: #ccc;
+                                   border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 12px;
+                                   transition: all 0.2s;">1B</button>
+                </div>
+
+                <div style="margin-bottom: 8px;">
+                    <button id="toggle-faker" style="
+                        width: 100%; padding: 10px; background: rgba(255,255,255,0.1); color: #fff;
+                        border: 1px solid #666; border-radius: 6px; cursor: pointer; font-weight: 500;
+                        transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px;
+                    ">Activate</button>
+                </div>
+
+                <div style="text-align: center; font-size: 10px; color: #666; margin-bottom: 0;">
+                    LARP ROBUX • LARP BOBUX
+                </div>
+
+                <button id="close-panel" style="
+                    position: absolute; top: 6px; right: 10px; background: none; border: none;
+                    color: #666; cursor: pointer; font-size: 18px; transition: color 0.2s;
+                ">×</button>
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+        document.getElementById('toggle-faker').addEventListener('click', toggleFaker);
+        document.getElementById('close-panel').addEventListener('click', () => {
+            panel.style.display = 'none';
+            createToggleButton();
+        });
+
+        panel.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = 'rgba(255,255,255,0.1)';
+                btn.style.borderColor = '#666';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.background = 'rgba(255,255,255,0.05)';
+                btn.style.borderColor = '#444';
+            });
+            btn.addEventListener('click', () => {
+                const amount = btn.dataset.amount;
+                const formatted = formatNumber(amount);
+                document.getElementById('fake-robux-input').value = formatted;
+                RobuxAmount = parseInt(amount);
+                if (isActive) updateRobuxDisplay();
+            });
+        });
+
+        const input = document.getElementById('fake-robux-input');
+        input.addEventListener('focus', () => {
+            input.style.borderColor = '#666';
+            input.style.background = 'rgba(255,255,255,0.08)';
+        });
+        input.addEventListener('blur', () => {
+            input.style.borderColor = '#444';
+            input.style.background = 'rgba(255,255,255,0.05)';
+        });
+        input.addEventListener('input', (e) => {
+            const cleanValue = e.target.value.replace(/[^\d]/g, '');
+            RobuxAmount = parseInt(cleanValue) || 0;
+            const formatted = formatNumber(cleanValue);
+            if (formatted !== e.target.value) {
+                e.target.value = formatted;
+            }
+            if (isActive) updateRobuxDisplay();
+        });
+
+        makeDraggable(panel);
+    }
+
+    function createToggleButton() {
+        const existingBtn = document.getElementById('robux-toggle-btn');
+        if (existingBtn) return;
+
+        const btn = document.createElement('button');
+        btn.id = 'robux-toggle-btn';
+        btn.innerHTML = 'R$';
+        btn.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 10, 10, 0.9);
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 6px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            z-index: 999998;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        `;
+
+        btn.addEventListener('mouseenter', () => {
+            btn.style.background = 'rgba(255,255,255,0.1)';
+            btn.style.borderColor = '#666';
+            btn.style.transform = 'scale(1.05)';
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.background = 'rgba(10, 10, 10, 0.9)';
+            btn.style.borderColor = '#444';
+            btn.style.transform = 'scale(1)';
+        });
+        btn.addEventListener('click', () => {
+            const panel = document.getElementById('robux-panel');
+            if (panel) {
+                panel.style.display = 'block';
+                btn.remove();
+            } else {
+                createControlPanel();
+                btn.remove();
+            }
+        });
+        document.body.appendChild(btn);
+    }
+
+    function makeDraggable(element) {
+        const header = element;
+
+        header.addEventListener('mousedown', (e) => {
+            if (e.target.id === 'toggle-faker' || e.target.id === 'close-panel' || e.target.classList.contains('preset-btn')) return;
+
+            isDragging = true;
+            dragOffset.x = e.clientX - element.offsetLeft;
+            dragOffset.y = e.clientY - element.offsetTop;
+            element.style.cursor = 'grabbing';
+            element.style.opacity = '0.8';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+
+            element.style.left = (e.clientX - dragOffset.x) + 'px';
+            element.style.top = (e.clientY - dragOffset.y) + 'px';
+            element.style.right = 'auto';
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            element.style.cursor = 'move';
+            element.style.opacity = '1';
+        });
+    }
+
+    function toggleFaker() {
+        isActive = !isActive;
+        const btn = document.getElementById('toggle-faker');
+
+        if (isActive) {
+            btn.textContent = 'Deactivate';
+            btn.style.background = 'rgba(255, 68, 68, 0.2)';
+            btn.style.borderColor = '#f44';
+            btn.style.color = '#f44';
+            saveOriginalAmount();
+            updateRobuxDisplay();
+        } else {
+            btn.textContent = 'Activate';
+            btn.style.background = 'rgba(255,255,255,0.1)';
+            btn.style.borderColor = '#666';
+            btn.style.color = '#fff';
+            restoreOriginalAmount();
+        }
+    }
+
+    function saveOriginalAmount() {
+        const element = document.querySelector('#nav-robux-amount');
+        if (element && !originalAmount) {
+            originalAmount = element.textContent.trim();
+        }
+    }
+
+    function updateRobuxDisplay() {
+        const element = document.querySelector('#nav-robux-amount');
+        if (element) {
+            const formatted = formatNumber(RobuxAmount);
+            element.textContent = formatted;
+        }
+    }
+
+    function restoreOriginalAmount() {
+        const element = document.querySelector('#nav-robux-amount');
+        if (element && originalAmount) {
+            element.textContent = originalAmount;
+        }
+    }
+
+    function monitorRobuxElements() {
+        const observer = new MutationObserver(() => {
+            if (!isActive) return;
+
+            const element = document.querySelector('#nav-robux-amount');
+            if (element && element.textContent.trim() !== formatNumber(RobuxAmount)) {
+                setTimeout(() => {
+                    if (isActive) updateRobuxDisplay();
+                }, 100);
+            }
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+
+    setTimeout(() => {
+        createToggleButton();
+        monitorRobuxElements();
+    }, 1500);
+
+})();// ==UserScript==
+// @name         Robux Gen V1
+// @namespace    http://waddleops.devv
+// @version      1.0
+// @description  Awsome bobux gen
+// @author       Waddle
+// @match        https://www.roblox.com/*
+// @match        https://roblox.com/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let RobuxAmount = 0;
+    let isActive = false;
+    let originalAmount = null;
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+
+    function formatNumber(num) {
+        if (!num || num === '0') return '0';
+        return parseInt(num).toLocaleString();
+    }
+
+    function createControlPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'robux-panel';
+        panel.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(10, 10, 10, 0.95);
+                border: 1px solid #333;
+                border-radius: 8px;
+                padding: 16px;
+                color: #ccc;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-size: 13px;
+                z-index: 999999;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+                min-width: 220px;
+                cursor: move;
+                backdrop-filter: blur(10px);
+                user-select: none;
+            ">
+                <div style="text-align: center; margin-bottom: 12px; font-weight: 500; color: #fff; letter-spacing: 1px;">
+                    R0BUX3R
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <input type="text" id="fake-robux-input" value="1,000,000"
+                           style="width: 100%; padding: 8px 12px; border: 1px solid #444; border-radius: 6px;
+                                  background: rgba(255,255,255,0.05); color: #fff; font-family: inherit;
+                                  font-size: 14px; outline: none; transition: all 0.2s;">
+                </div>
+
+                <div style="margin-bottom: 12px; display: flex; gap: 8px;">
+                    <button class="preset-btn" data-amount="69420"
+                            style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: #ccc;
+                                   border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 12px;
+                                   transition: all 0.2s;">69.4K</button>
+                    <button class="preset-btn" data-amount="1000000"
+                            style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: #ccc;
+                                   border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 12px;
+                                   transition: all 0.2s;">1M</button>
+                    <button class="preset-btn" data-amount="1000000000"
+                            style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: #ccc;
+                                   border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 12px;
+                                   transition: all 0.2s;">1B</button>
+                </div>
+
+                <div style="margin-bottom: 8px;">
+                    <button id="toggle-faker" style="
+                        width: 100%; padding: 10px; background: rgba(255,255,255,0.1); color: #fff;
+                        border: 1px solid #666; border-radius: 6px; cursor: pointer; font-weight: 500;
+                        transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px;
+                    ">Activate</button>
+                </div>
+
+                <div style="text-align: center; font-size: 10px; color: #666; margin-bottom: 0;">
+                    LARP ROBUX • LARP BOBUX
+                </div>
+
+                <button id="close-panel" style="
+                    position: absolute; top: 6px; right: 10px; background: none; border: none;
+                    color: #666; cursor: pointer; font-size: 18px; transition: color 0.2s;
+                ">×</button>
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+        document.getElementById('toggle-faker').addEventListener('click', toggleFaker);
+        document.getElementById('close-panel').addEventListener('click', () => {
+            panel.style.display = 'none';
+            createToggleButton();
+        });
+
+        panel.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = 'rgba(255,255,255,0.1)';
+                btn.style.borderColor = '#666';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.background = 'rgba(255,255,255,0.05)';
+                btn.style.borderColor = '#444';
+            });
+            btn.addEventListener('click', () => {
+                const amount = btn.dataset.amount;
+                const formatted = formatNumber(amount);
+                document.getElementById('fake-robux-input').value = formatted;
+                RobuxAmount = parseInt(amount);
+                if (isActive) updateRobuxDisplay();
+            });
+        });
+
+        const input = document.getElementById('fake-robux-input');
+        input.addEventListener('focus', () => {
+            input.style.borderColor = '#666';
+            input.style.background = 'rgba(255,255,255,0.08)';
+        });
+        input.addEventListener('blur', () => {
+            input.style.borderColor = '#444';
+            input.style.background = 'rgba(255,255,255,0.05)';
+        });
+        input.addEventListener('input', (e) => {
+            const cleanValue = e.target.value.replace(/[^\d]/g, '');
+            RobuxAmount = parseInt(cleanValue) || 0;
+            const formatted = formatNumber(cleanValue);
+            if (formatted !== e.target.value) {
+                e.target.value = formatted;
+            }
+            if (isActive) updateRobuxDisplay();
+        });
+
+        makeDraggable(panel);
+    }
+
+    function createToggleButton() {
+        const existingBtn = document.getElementById('robux-toggle-btn');
+        if (existingBtn) return;
+
+        const btn = document.createElement('button');
+        btn.id = 'robux-toggle-btn';
+        btn.innerHTML = 'R$';
+        btn.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 10, 10, 0.9);
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 6px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            z-index: 999998;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        `;
+
+        btn.addEventListener('mouseenter', () => {
+            btn.style.background = 'rgba(255,255,255,0.1)';
+            btn.style.borderColor = '#666';
+            btn.style.transform = 'scale(1.05)';
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.background = 'rgba(10, 10, 10, 0.9)';
+            btn.style.borderColor = '#444';
+            btn.style.transform = 'scale(1)';
+        });
+        btn.addEventListener('click', () => {
+            const panel = document.getElementById('robux-panel');
+            if (panel) {
+                panel.style.display = 'block';
+                btn.remove();
+            } else {
+                createControlPanel();
+                btn.remove();
+            }
+        });
+        document.body.appendChild(btn);
+    }
+
+    function makeDraggable(element) {
+        const header = element;
+
+        header.addEventListener('mousedown', (e) => {
+            if (e.target.id === 'toggle-faker' || e.target.id === 'close-panel' || e.target.classList.contains('preset-btn')) return;
+
+            isDragging = true;
+            dragOffset.x = e.clientX - element.offsetLeft;
+            dragOffset.y = e.clientY - element.offsetTop;
+            element.style.cursor = 'grabbing';
+            element.style.opacity = '0.8';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+
+            element.style.left = (e.clientX - dragOffset.x) + 'px';
+            element.style.top = (e.clientY - dragOffset.y) + 'px';
+            element.style.right = 'auto';
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            element.style.cursor = 'move';
+            element.style.opacity = '1';
+        });
+    }
+
+    function toggleFaker() {
+        isActive = !isActive;
+        const btn = document.getElementById('toggle-faker');
+
+        if (isActive) {
+            btn.textContent = 'Deactivate';
+            btn.style.background = 'rgba(255, 68, 68, 0.2)';
+            btn.style.borderColor = '#f44';
+            btn.style.color = '#f44';
+            saveOriginalAmount();
+            updateRobuxDisplay();
+        } else {
+            btn.textContent = 'Activate';
+            btn.style.background = 'rgba(255,255,255,0.1)';
+            btn.style.borderColor = '#666';
+            btn.style.color = '#fff';
+            restoreOriginalAmount();
+        }
+    }
+
+    function saveOriginalAmount() {
+        const element = document.querySelector('#nav-robux-amount');
+        if (element && !originalAmount) {
+            originalAmount = element.textContent.trim();
+        }
+    }
+
+    function updateRobuxDisplay() {
+        const element = document.querySelector('#nav-robux-amount');
+        if (element) {
+            const formatted = formatNumber(RobuxAmount);
+            element.textContent = formatted;
+        }
+    }
+
+    function restoreOriginalAmount() {
+        const element = document.querySelector('#nav-robux-amount');
+        if (element && originalAmount) {
+            element.textContent = originalAmount;
+        }
+    }
+
+    function monitorRobuxElements() {
+        const observer = new MutationObserver(() => {
+            if (!isActive) return;
+
+            const element = document.querySelector('#nav-robux-amount');
+            if (element && element.textContent.trim() !== formatNumber(RobuxAmount)) {
+                setTimeout(() => {
+                    if (isActive) updateRobuxDisplay();
+                }, 100);
+            }
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+
+    setTimeout(() => {
+        createToggleButton();
+        monitorRobuxElements();
+    }, 1500);
+
+})();// ==UserScript==
+// @name         Robux Gen V1
+// @namespace    http://waddleops.devv
+// @version      1.0
+// @description  Awsome bobux gen
+// @author       Waddle
+// @match        https://www.roblox.com/*
+// @match        https://roblox.com/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let RobuxAmount = 0;
+    let isActive = false;
+    let originalAmount = null;
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+
+    function formatNumber(num) {
+        if (!num || num === '0') return '0';
+        return parseInt(num).toLocaleString();
+    }
+
+    function createControlPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'robux-panel';
+        panel.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(10, 10, 10, 0.95);
+                border: 1px solid #333;
+                border-radius: 8px;
+                padding: 16px;
+                color: #ccc;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-size: 13px;
+                z-index: 999999;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+                min-width: 220px;
+                cursor: move;
+                backdrop-filter: blur(10px);
+                user-select: none;
+            ">
+                <div style="text-align: center; margin-bottom: 12px; font-weight: 500; color: #fff; letter-spacing: 1px;">
+                    R0BUX3R
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <input type="text" id="fake-robux-input" value="1,000,000"
+                           style="width: 100%; padding: 8px 12px; border: 1px solid #444; border-radius: 6px;
+                                  background: rgba(255,255,255,0.05); color: #fff; font-family: inherit;
+                                  font-size: 14px; outline: none; transition: all 0.2s;">
+                </div>
+
+                <div style="margin-bottom: 12px; display: flex; gap: 8px;">
+                    <button class="preset-btn" data-amount="69420"
+                            style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: #ccc;
+                                   border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 12px;
+                                   transition: all 0.2s;">69.4K</button>
+                    <button class="preset-btn" data-amount="1000000"
+                            style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: #ccc;
+                                   border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 12px;
+                                   transition: all 0.2s;">1M</button>
+                    <button class="preset-btn" data-amount="1000000000"
+                            style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: #ccc;
+                                   border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 12px;
+                                   transition: all 0.2s;">1B</button>
+                </div>
+
+                <div style="margin-bottom: 8px;">
+                    <button id="toggle-faker" style="
+                        width: 100%; padding: 10px; background: rgba(255,255,255,0.1); color: #fff;
+                        border: 1px solid #666; border-radius: 6px; cursor: pointer; font-weight: 500;
+                        transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px;
+                    ">Activate</button>
+                </div>
+
+                <div style="text-align: center; font-size: 10px; color: #666; margin-bottom: 0;">
+                    LARP ROBUX • LARP BOBUX
+                </div>
+
+                <button id="close-panel" style="
+                    position: absolute; top: 6px; right: 10px; background: none; border: none;
+                    color: #666; cursor: pointer; font-size: 18px; transition: color 0.2s;
+                ">×</button>
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+        document.getElementById('toggle-faker').addEventListener('click', toggleFaker);
+        document.getElementById('close-panel').addEventListener('click', () => {
+            panel.style.display = 'none';
+            createToggleButton();
+        });
+
+        panel.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = 'rgba(255,255,255,0.1)';
+                btn.style.borderColor = '#666';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.background = 'rgba(255,255,255,0.05)';
+                btn.style.borderColor = '#444';
+            });
+            btn.addEventListener('click', () => {
+                const amount = btn.dataset.amount;
+                const formatted = formatNumber(amount);
+                document.getElementById('fake-robux-input').value = formatted;
+                RobuxAmount = parseInt(amount);
+                if (isActive) updateRobuxDisplay();
+            });
+        });
+
+        const input = document.getElementById('fake-robux-input');
+        input.addEventListener('focus', () => {
+            input.style.borderColor = '#666';
+            input.style.background = 'rgba(255,255,255,0.08)';
+        });
+        input.addEventListener('blur', () => {
+            input.style.borderColor = '#444';
+            input.style.background = 'rgba(255,255,255,0.05)';
+        });
+        input.addEventListener('input', (e) => {
+            const cleanValue = e.target.value.replace(/[^\d]/g, '');
+            RobuxAmount = parseInt(cleanValue) || 0;
+            const formatted = formatNumber(cleanValue);
+            if (formatted !== e.target.value) {
+                e.target.value = formatted;
+            }
+            if (isActive) updateRobuxDisplay();
+        });
+
+        makeDraggable(panel);
+    }
+
+    function createToggleButton() {
+        const existingBtn = document.getElementById('robux-toggle-btn');
+        if (existingBtn) return;
+
+        const btn = document.createElement('button');
+        btn.id = 'robux-toggle-btn';
+        btn.innerHTML = 'R$';
+        btn.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 10, 10, 0.9);
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 6px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            z-index: 999998;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        `;
+
+        btn.addEventListener('mouseenter', () => {
+            btn.style.background = 'rgba(255,255,255,0.1)';
+            btn.style.borderColor = '#666';
+            btn.style.transform = 'scale(1.05)';
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.background = 'rgba(10, 10, 10, 0.9)';
+            btn.style.borderColor = '#444';
+            btn.style.transform = 'scale(1)';
+        });
+        btn.addEventListener('click', () => {
+            const panel = document.getElementById('robux-panel');
+            if (panel) {
+                panel.style.display = 'block';
+                btn.remove();
+            } else {
+                createControlPanel();
+                btn.remove();
+            }
+        });
+        document.body.appendChild(btn);
+    }
+
+    function makeDraggable(element) {
+        const header = element;
+
+        header.addEventListener('mousedown', (e) => {
+            if (e.target.id === 'toggle-faker' || e.target.id === 'close-panel' || e.target.classList.contains('preset-btn')) return;
+
+            isDragging = true;
+            dragOffset.x = e.clientX - element.offsetLeft;
+            dragOffset.y = e.clientY - element.offsetTop;
+            element.style.cursor = 'grabbing';
+            element.style.opacity = '0.8';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+
+            element.style.left = (e.clientX - dragOffset.x) + 'px';
+            element.style.top = (e.clientY - dragOffset.y) + 'px';
+            element.style.right = 'auto';
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            element.style.cursor = 'move';
+            element.style.opacity = '1';
+        });
+    }
+
+    function toggleFaker() {
+        isActive = !isActive;
+        const btn = document.getElementById('toggle-faker');
+
+        if (isActive) {
+            btn.textContent = 'Deactivate';
+            btn.style.background = 'rgba(255, 68, 68, 0.2)';
+            btn.style.borderColor = '#f44';
+            btn.style.color = '#f44';
+            saveOriginalAmount();
+            updateRobuxDisplay();
+        } else {
+            btn.textContent = 'Activate';
+            btn.style.background = 'rgba(255,255,255,0.1)';
+            btn.style.borderColor = '#666';
+            btn.style.color = '#fff';
+            restoreOriginalAmount();
+        }
+    }
+
+    function saveOriginalAmount() {
+        const element = document.querySelector('#nav-robux-amount');
+        if (element && !originalAmount) {
+            originalAmount = element.textContent.trim();
+        }
+    }
+
+    function updateRobuxDisplay() {
+        const element = document.querySelector('#nav-robux-amount');
+        if (element) {
+            const formatted = formatNumber(RobuxAmount);
+            element.textContent = formatted;
+        }
+    }
+
+    function restoreOriginalAmount() {
+        const element = document.querySelector('#nav-robux-amount');
+        if (element && originalAmount) {
+            element.textContent = originalAmount;
+        }
+    }
+
+    function monitorRobuxElements() {
+        const observer = new MutationObserver(() => {
+            if (!isActive) return;
+
+            const element = document.querySelector('#nav-robux-amount');
+            if (element && element.textContent.trim() !== formatNumber(RobuxAmount)) {
+                setTimeout(() => {
+                    if (isActive) updateRobuxDisplay();
+                }, 100);
+            }
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+
+    setTimeout(() => {
+        createToggleButton();
+        monitorRobuxElements();
+    }, 1500);
+
+})();// ==UserScript==
+// @name         Robux Gen V1
+// @namespace    http://waddleops.devv
+// @version      1.0
+// @description  Awsome bobux gen
+// @author       Waddle
+// @match        https://www.roblox.com/*
+// @match        https://roblox.com/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let RobuxAmount = 0;
+    let isActive = false;
+    let originalAmount = null;
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+
+    function formatNumber(num) {
+        if (!num || num === '0') return '0';
+        return parseInt(num).toLocaleString();
+    }
+
+    function createControlPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'robux-panel';
+        panel.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(10, 10, 10, 0.95);
+                border: 1px solid #333;
+                border-radius: 8px;
+                padding: 16px;
+                color: #ccc;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-size: 13px;
+                z-index: 999999;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+                min-width: 220px;
+                cursor: move;
+                backdrop-filter: blur(10px);
+                user-select: none;
+            ">
+                <div style="text-align: center; margin-bottom: 12px; font-weight: 500; color: #fff; letter-spacing: 1px;">
+                    R0BUX3R
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <input type="text" id="fake-robux-input" value="1,000,000"
+                           style="width: 100%; padding: 8px 12px; border: 1px solid #444; border-radius: 6px;
+                                  background: rgba(255,255,255,0.05); color: #fff; font-family: inherit;
+                                  font-size: 14px; outline: none; transition: all 0.2s;">
+                </div>
+
+                <div style="margin-bottom: 12px; display: flex; gap: 8px;">
+                    <button class="preset-btn" data-amount="69420"
+                            style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: #ccc;
+                                   border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 12px;
+                                   transition: all 0.2s;">69.4K</button>
+                    <button class="preset-btn" data-amount="1000000"
+                            style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: #ccc;
+                                   border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 12px;
+                                   transition: all 0.2s;">1M</button>
+                    <button class="preset-btn" data-amount="1000000000"
+                            style="flex: 1; padding: 8px; background: rgba(255,255,255,0.05); color: #ccc;
+                                   border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 12px;
+                                   transition: all 0.2s;">1B</button>
+                </div>
+
+                <div style="margin-bottom: 8px;">
+                    <button id="toggle-faker" style="
+                        width: 100%; padding: 10px; background: rgba(255,255,255,0.1); color: #fff;
+                        border: 1px solid #666; border-radius: 6px; cursor: pointer; font-weight: 500;
+                        transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px;
+                    ">Activate</button>
+                </div>
+
+                <div style="text-align: center; font-size: 10px; color: #666; margin-bottom: 0;">
+                    LARP ROBUX • LARP BOBUX
+                </div>
+
+                <button id="close-panel" style="
+                    position: absolute; top: 6px; right: 10px; background: none; border: none;
+                    color: #666; cursor: pointer; font-size: 18px; transition: color 0.2s;
+                ">×</button>
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+        document.getElementById('toggle-faker').addEventListener('click', toggleFaker);
+        document.getElementById('close-panel').addEventListener('click', () => {
+            panel.style.display = 'none';
+            createToggleButton();
+        });
+
+        panel.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = 'rgba(255,255,255,0.1)';
+                btn.style.borderColor = '#666';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.background = 'rgba(255,255,255,0.05)';
+                btn.style.borderColor = '#444';
+            });
+            btn.addEventListener('click', () => {
+                const amount = btn.dataset.amount;
+                const formatted = formatNumber(amount);
+                document.getElementById('fake-robux-input').value = formatted;
+                RobuxAmount = parseInt(amount);
+                if (isActive) updateRobuxDisplay();
+            });
+        });
+
+        const input = document.getElementById('fake-robux-input');
+        input.addEventListener('focus', () => {
+            input.style.borderColor = '#666';
+            input.style.background = 'rgba(255,255,255,0.08)';
+        });
+        input.addEventListener('blur', () => {
+            input.style.borderColor = '#444';
+            input.style.background = 'rgba(255,255,255,0.05)';
+        });
+        input.addEventListener('input', (e) => {
+            const cleanValue = e.target.value.replace(/[^\d]/g, '');
+            RobuxAmount = parseInt(cleanValue) || 0;
+            const formatted = formatNumber(cleanValue);
+            if (formatted !== e.target.value) {
+                e.target.value = formatted;
+            }
+            if (isActive) updateRobuxDisplay();
+        });
+
+        makeDraggable(panel);
+    }
+
+    function createToggleButton() {
+        const existingBtn = document.getElementById('robux-toggle-btn');
+        if (existingBtn) return;
+
+        const btn = document.createElement('button');
+        btn.id = 'robux-toggle-btn';
+        btn.innerHTML = 'R$';
+        btn.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 10, 10, 0.9);
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 6px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            z-index: 999998;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        `;
+
+        btn.addEventListener('mouseenter', () => {
+            btn.style.background = 'rgba(255,255,255,0.1)';
+            btn.style.borderColor = '#666';
+            btn.style.transform = 'scale(1.05)';
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.background = 'rgba(10, 10, 10, 0.9)';
+            btn.style.borderColor = '#444';
+            btn.style.transform = 'scale(1)';
+        });
+        btn.addEventListener('click', () => {
+            const panel = document.getElementById('robux-panel');
+            if (panel) {
+                panel.style.display = 'block';
+                btn.remove();
+            } else {
+                createControlPanel();
+                btn.remove();
+            }
+        });
+        document.body.appendChild(btn);
+    }
+
+    function makeDraggable(element) {
+        const header = element;
+
+        header.addEventListener('mousedown', (e) => {
+            if (e.target.id === 'toggle-faker' || e.target.id === 'close-panel' || e.target.classList.contains('preset-btn')) return;
+
+            isDragging = true;
+            dragOffset.x = e.clientX - element.offsetLeft;
+            dragOffset.y = e.clientY - element.offsetTop;
+            element.style.cursor = 'grabbing';
+            element.style.opacity = '0.8';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+
+            element.style.left = (e.clientX - dragOffset.x) + 'px';
+            element.style.top = (e.clientY - dragOffset.y) + 'px';
+            element.style.right = 'auto';
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            element.style.cursor = 'move';
+            element.style.opacity = '1';
+        });
+    }
+
+    function toggleFaker() {
+        isActive = !isActive;
+        const btn = document.getElementById('toggle-faker');
+
+        if (isActive) {
+            btn.textContent = 'Deactivate';
+            btn.style.background = 'rgba(255, 68, 68, 0.2)';
+            btn.style.borderColor = '#f44';
+            btn.style.color = '#f44';
+            saveOriginalAmount();
+            updateRobuxDisplay();
+        } else {
+            btn.textContent = 'Activate';
+            btn.style.background = 'rgba(255,255,255,0.1)';
+            btn.style.borderColor = '#666';
+            btn.style.color = '#fff';
+            restoreOriginalAmount();
+        }
+    }
+
+    function saveOriginalAmount() {
+        const element = document.querySelector('#nav-robux-amount');
+        if (element && !originalAmount) {
+            originalAmount = element.textContent.trim();
+        }
+    }
+
+    function updateRobuxDisplay() {
+        const element = document.querySelector('#nav-robux-amount');
+        if (element) {
+            const formatted = formatNumber(RobuxAmount);
+            element.textContent = formatted;
+        }
+    }
+
+    function restoreOriginalAmount() {
+        const element = document.querySelector('#nav-robux-amount');
+        if (element && originalAmount) {
+            element.textContent = originalAmount;
+        }
+    }
+
+    function monitorRobuxElements() {
+        const observer = new MutationObserver(() => {
+            if (!isActive) return;
+
+            const element = document.querySelector('#nav-robux-amount');
+            if (element && element.textContent.trim() !== formatNumber(RobuxAmount)) {
+                setTimeout(() => {
+                    if (isActive) updateRobuxDisplay();
+                }, 100);
+            }
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+
+    setTimeout(() => {
+        createToggleButton();
+        monitorRobuxElements();
+    }, 1500);
+
+})();
